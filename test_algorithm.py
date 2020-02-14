@@ -22,11 +22,11 @@ E = len(edges)
 
 used = [False for i in range(E)]
 
-<<<<<<< HEAD
 from math import sqrt, log
 
 def get_stats(v):
-    n_snp = 0 if not v['node'] in gene_snps else gene_snps[v['node']] n_dis = 0 if not v['node'] in gene_diss else gene_diss[v['node']]
+    n_snp = 0 if not v['node'] in gene_snps else gene_snps[v['node']]
+    n_dis = 0 if not v['node'] in gene_diss else gene_diss[v['node']]
     con_a = len(v['a'])
     con_b = len(v['b'])
     g_deg = gene_degs[v['node']]
