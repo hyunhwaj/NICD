@@ -4,11 +4,15 @@ import logging
 
 class Solver:
     df = pd.read_table("data/PCNet_v1.3.tsv", sep = "\t")
+    
     G = nx.from_pandas_edgelist(df, 'from', 'to')
     G.remove_node("UBC")
     snp2disease = pd.read_table("data/all_variant_disease_associations.tsv.gz", sep = "\t")
     snp2gene = pd.read_table("data/variant_to_gene_mappings.tsv.gz", sep = "\t")
-
+    
+    df = pd.read_table("./data/all_gene_disease_associations.tsv.gz")
+    df = df[(df.diseaseType == "disease") | (df.diseaseType == "phenotype")]
+    disease_ids = list(set(df.diseaseId))
 
     @staticmethod
     def map_snp_to_genes(disease_id):
@@ -18,8 +22,12 @@ class Solver:
             snps = set(Solver.snp2disease[Solver.snp2disease.diseaseId==disease_id].snpId)
         genes = set(Solver.snp2gene[Solver.snp2gene['snpId'].isin(snps)].geneSymbol)
         return genes 
-    
-    
+   
+    @staticmethod
+    def get_neighbor_genes(disease_id):
+        init_genes = Solver.map_snp_to_genes(disease_id)
+        return set().union(*[ Solver.G.neighbors(n) for n in init_genes if n in Solver.G.nodes ])
+            
     @staticmethod
     def get_neighbors(disease_id):
         genes = Solver.map_snp_to_genes(disease_id)
@@ -154,14 +162,14 @@ class Solver:
                     i = j
 
             if i is None:
-                print("Not found")
+                # print("Not found")
                 break
 
             used[i] = True
             remained_A -= edges[i]['a']
             remained_B -= edges[i]['b']
 
-            print(df.iloc[i].node, df.iloc[i].rank_agg, edges[i]['a'], edges[i]['b'])
+            # print(df.iloc[i].node, df.iloc[i].rank_agg, edges[i]['a'], edges[i]['b'])
             results.append({
                 'node' : df.iloc[i].node,
                 'rank_agg' : df.iloc[i].rank_agg,
@@ -189,11 +197,59 @@ class Solver:
                 valid = True
                 break
             
-        print(remained_A) 
-        print(remained_B)
-            
         return {
             'result' : results,
             'edges' : solution_edges,
             'valid' : valid
         }
+        
+    @staticmethod
+    def list_candidates(obj_A, obj_B):
+        deg = dict(Solver.G.degree)
+        df = Solver.snp2disease.merge(Solver.snp2gene, on = "snpId")
+        gene_snps = df.groupby(['geneSymbol'])['snpId'].count().to_dict()
+        gene_degs = dict(Solver.G.degree)
+
+        df = pd.read_table("./data/all_gene_disease_associations.tsv.gz")
+        df = df[(df.diseaseType == "disease") | (df.diseaseType == "phenotype")]
+        gene_diss = df.groupby(['geneSymbol'])['diseaseId'].count().to_dict()
+
+        remained_A, remained_B = obj_A['init'] - obj_B['init'], obj_B['init'] - obj_A['init']
+
+        edges = Solver.format_neighbors_object(obj_A, obj_B)
+        E = len(edges)
+
+        used = [False for i in range(E)]
+
+        from math import sqrt, log
+
+        def get_stats(v):
+            n_snp = 0 if not v['node'] in gene_snps else gene_snps[v['node']]
+            n_dis = 0 if not v['node'] in gene_diss else gene_diss[v['node']]
+            con_a = len(v['a'])
+            con_b = len(v['b'])
+            g_deg = gene_degs[v['node']]
+
+            return {
+                'n_snp' : n_snp,
+                'n_dis' : n_dis,
+                'con_a' : con_a,
+                'con_b' : con_b,
+                'g_deg' : g_deg
+            }
+
+        cur_status = []
+        for j, v in enumerate(edges):
+            stat_v = get_stats(v)
+            stat_v.update(v)
+            cur_status.append(stat_v)
+
+        df = pd.DataFrame(cur_status)
+        df['rank_con_a'] = df['con_a'].rank(ascending=False)
+        df['rank_con_b'] = df['con_b'].rank(ascending=False)
+        df['rank_n_snp'] = df['n_snp'].rank(ascending=False)
+        df['rank_n_dis'] = df['n_dis'].rank(ascending=False)
+        df['rank_g_deg'] = df['g_deg'].rank(ascending=False)
+        df['rank_agg'] = ((df['rank_con_a'] * df['rank_con_b']) ** (1/2) / (df['rank_n_snp'] * df['rank_n_dis'] * df['rank_g_deg']) ** (1/3))        
+        
+        return df
