@@ -1,16 +1,18 @@
 import networkx as nx
 import pandas as pd
 import logging
+import os
 
 class Solver:
-    df = pd.read_table("data/PCNet_v1.3.tsv", sep = "\t")
+    data_path = os.path.join(os.path.dirname(__file__), "../data")
+    df = pd.read_table(f"{data_path}/PCNet_v1.3.tsv", sep = "\t")
     
     G = nx.from_pandas_edgelist(df, 'from', 'to')
     G.remove_node("UBC")
-    snp2disease = pd.read_table("data/all_variant_disease_associations.tsv.gz", sep = "\t")
-    snp2gene = pd.read_table("data/variant_to_gene_mappings.tsv.gz", sep = "\t")
+    snp2disease = pd.read_table(f"{data_path}/all_variant_disease_associations.tsv.gz", sep = "\t")
+    snp2gene = pd.read_table(f"{data_path}/variant_to_gene_mappings.tsv.gz", sep = "\t")
     
-    df = pd.read_table("./data/all_gene_disease_associations.tsv.gz")
+    df = pd.read_table(f"{data_path}/all_gene_disease_associations.tsv.gz")
     df = df[(df.diseaseType == "disease") | (df.diseaseType == "phenotype")]
     disease_ids = list(set(df.diseaseId))
 
@@ -59,38 +61,48 @@ class Solver:
             'b' : obj_B['neighbors'][v] - obj_A['init'] if v in obj_B['neighbors'] else set() } for v in all_intermed_genes ]
         return sorted(edges, key = lambda v : -len(v['a']) * len(v['b']))
     
-
     @staticmethod
-    def solve_sequencial(obj_A, obj_B):
-        ordered_intermed_genes = Solver.format_neighbors_object(obj_A, obj_B)
+    def list_candidates(obj_A, obj_B):
+        deg = dict(Solver.G.degree)
+        df = Solver.snp2disease.merge(Solver.snp2gene, on = "snpId")
+        gene_snps = df.groupby(['geneSymbol'])['snpId'].count().to_dict()
+        gene_degs = dict(Solver.G.degree)
+
+        data_path = os.path.join(os.path.dirname(__file__), "../data")
+        df = pd.read_table(f"{data_path}/all_gene_disease_associations.tsv.gz")
+        df = df[(df.diseaseType == "disease") | (df.diseaseType == "phenotype")]
+        gene_diss = df.groupby(['geneSymbol'])['diseaseId'].count().to_dict()
+
         remained_A, remained_B = obj_A['init'] - obj_B['init'], obj_B['init'] - obj_A['init']
-        found = False
-        solution = []
-        solution_edges = { 'from' : [], 'to' : [], 'group': [] }
 
-        for v in ordered_intermed_genes:
-            if len(remained_A) == 0 and len(remained_B) == 0:
-                found = True
-                break
+        edges = Solver.format_neighbors_object(obj_A, obj_B)
+        E = len(edges)
 
-            if len(remained_A & v['a']) == 0 and len(remained_B & v['b']) == 0:
-                continue
+        used = [False for i in range(E)]
 
-            solution.append(v['node'])
+        from math import sqrt, log
 
-            remained_A -= v['a']
-            remained_B -= v['b']
+        def get_stats(v):
+            n_snp = 0 if not v['node'] in gene_snps else gene_snps[v['node']]
+            n_dis = 0 if not v['node'] in gene_diss else gene_diss[v['node']]
+            con_a = len(v['a'])
+            con_b = len(v['b'])
+            g_deg = gene_degs[v['node']]
 
-            for g in ['a', 'b']:
-                for n in v[g]:
-                    solution_edges['from'].append(v['node'])
-                    solution_edges['to'].append(n)
-                    solution_edges['group'].append(g)
+            return {
+                'n_snp' : n_snp,
+                'n_dis' : n_dis,
+                'con_a' : con_a,
+                'con_b' : con_b,
+                'g_deg' : g_deg
+            }
 
-        return {
-            'node' : solution,
-            'edges' : solution_edges,
-            'result' : found
-        }
+        cur_status = []
+        for j, v in enumerate(edges):
+            stat_v = get_stats(v)
+            stat_v.update(v)
+            cur_status.append(stat_v)
 
-    
+        df = pd.DataFrame(cur_status)
+        
+        return df

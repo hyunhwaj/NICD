@@ -2,8 +2,8 @@ from distutils.core import setup
 
 setup(
     name = "NICD",
-    packages = ["ncid"],
-    install_requires = ["numpy", "scipy", "tqdm", "sklearn", "pandas"],
+    packages = ["NICD"],
+    install_requires = ["numpy", "scipy", "tqdm", "networkx", "pandas"],
     version = "0.0.1",
     description = "Identifying potential common gene drivers that can cause multiple-diseases.",
     author="Hyun-Hwan Jeong",
