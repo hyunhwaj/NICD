@@ -1,0 +1,26 @@
+
+{
+    "PCNet" : {
+        "url": "http://public.ndexbio.org",
+        "id": "4de852d9-9908-11e9-bcaf-0ac135e8bacf"
+    },
+
+    "DisGeNET": [
+        { 
+            "filename": "disease_to_disease_ALL.tsv.gz",
+            "id": "1iXk7muCuPzOguBV86Tra7rYBTxJ-Okr5"
+        },
+        {
+            "filename": "all_gene_disease_associations.tsv.gz",
+            "id": "1xo-CcUUkHu_f1vDFyDPqspVJPJNpqiQF"
+        },
+        {
+            "filename": "all_variant_disease_associations.tsv.gz",
+            "id": "1jdiaHu9UeZ2DKi2yEXH2EAGnHx9DuPlo"
+        }, 
+        {
+            "filename": "variant_to_gene_mappings.tsv.gz",
+            "id": "1TOD4xIXF5nNNgKLbgJoVIcFFQWuuUNvy"
+        }
+    ]
+}
