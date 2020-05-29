@@ -1,4 +1,5 @@
-from distutils.core import setup
+from setuptools import setup
+
 
 setup(
     name = "NICD",
@@ -11,6 +12,8 @@ setup(
     keywords=["disease", "gene", "regulation", "bioinformatics"],
     url="https://github.com/hyunhwaj/NICD",
     scripts=[
-        "bin/NICD"
-    ]
+        "bin/NICD",
+        "bin/NICD_DB_download"
+    ],
+    include_package_data=True
 )

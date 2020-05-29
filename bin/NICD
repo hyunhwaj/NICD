@@ -1,122 +1,9 @@
 #!/usr/bin/env python
 
-import sys, logging, random, os
-from tqdm import tqdm
-import matplotlib.pyplot as plt
-import numpy as np
-from statsmodels.stats.multitest import multipletests        
-import argparse
-
-
-def main(disease_a, disease_b, 
-         name_a, name_b,
-         niter, cutoff=0.05, 
-         random_seed=None, 
-         outpath='results',
-         verbose=False):
-        
-    FORMAT = '%(asctime)-15s %(name)s %(levelname)s %(message)s'
-    
-    if verbose:
-        logging.basicConfig(level=logging.DEBUG, format=FORMAT)
-    else:
-        logging.basicConfig(level=logging.INFO, format=FORMAT)
-            
-    logging.info("Loading Solver module.")
-    import pandas as pd
-    from NICD.Solver import Solver
-
-    logging.info("Starting NICD.")
-
-    disease_a = disease_a.split(",")
-    disease_a = disease_b.split(",")
-    
-    A = Solver.get_neighbors(disease_a)
-    B = Solver.get_neighbors(disease_b)
-
-    ret = Solver.list_candidates(A, B)
-    print(sum(ret.con_a>0))
-    logging.DEBUG(f"{sum(ret.con_a>0)} and {sum(ret.con_b>0)} genes were found with both diseases.")
-    ret = ret[(ret.con_a>0)&(ret.con_b>0)]
-
-    def time_now():
-        from datetime import datetime
-        return datetime.now().strftime("%H:%M:%S")
-
-    if random_seed is None:
-        random_seed = random.randrange(sys.maxsize)
-    random.seed(random_seed)
-    
-    logging.info(f"{random_seed} is the random seed.")
-        
-    from collections import defaultdict
-    null_cnt = defaultdict(int)
-
-    NUM_ITER = max(int(len(ret.node) * niter),1)
-
-    logging.info(f"Starting a permutation Test. {NUM_ITER} iterations will be performed.")
-
-    null_common = []
-    for i in tqdm(range(1, NUM_ITER+1)):
-        null_ids = random.choices(Solver.disease_ids, k=len(disease_a) + len(disease_b))
-        null_a = Solver.get_neighbor_genes(null_ids[:len(disease_a)])
-        null_b = Solver.get_neighbor_genes(null_ids[len(disease_a):])
-        null_common.append(null_a & null_b)
-
-    for i in null_common:
-        for v in i:
-            null_cnt[v] += 1
-
-    logging.info("The end of the permutation Test.")
-
-    pval = [null_cnt[v] / NUM_ITER for v in ret.node]
-
-
-    logging.info("Calculating adjusted p-value of each candidate gene.")
-
-
-    fdr = multipletests(pval, method = "fdr_bh")
-    plt.hist(fdr[1])
-
-    ret["pvalue"] = pval
-    ret["padjust"] = fdr[1]
-
-    if not os.path.exists(outpath):
-        logging.info(f"NICD creates {outpath} to store outputs.")
-        os.makedirs(outpath)
-
-    logging.info(f"Generating outputs to {outpath}")
-    ret.to_csv(f"{outpath}/permutation-test.csv", index=False)
-
-    logging.info("NICD found {} putative driver genes.".format(ret[ret.fdr<cutoff].shape[0]))
-
-
-    valid_ret = ret[ret.fdr<cutoff]
-    
-    logging.info(f"Generating outputs to {outpath}.")
-    
-    with open(f"{outpath}/edges.tsv", "w") as oup:
-        print("from", "to", sep="\t", file=oup)
-        for i in range(valid_ret.shape[0]):
-            fr = valid_ret.iloc[i]['node']
-            for to in valid_ret.iloc[i]['a']:
-                print(fr, to, sep="\t", file=oup)
-            for to in valid_ret.iloc[i]['b']:
-                print(fr, to, sep="\t", file=oup)
-
-
-    with open(f"{outpath}/node.tsv", "w") as oup:
-        print("gene", "category", sep="\t", file=oup)
-        for x in valid_ret.node:
-            print(x, "common", sep="\t", file=oup)
-        for a in set.union(*ret[ret.fdr<cutoff].a):
-            print(a, name_a, sep="\t", file=oup)
-        for b in set.union(*ret[ret.fdr<cutoff].b):
-            print(b, name_b, sep="\t", file=oup)
-
-    logging.info("NICD has successfuly completed all tasks.")
+from NICD.main import main
 
 if __name__ == "__main__":
+    import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("-a", "--disease_a", help="A list of DisGeNet disease IDs.", type=str, required=True)
     parser.add_argument("-b", "--disease_b", help="Another list of DisGeNet disease IDs.", type=str, required=True)
@@ -134,6 +21,6 @@ if __name__ == "__main__":
     parser.add_argument("--name_a", help="The name of the first list.", default="disease A")
     parser.add_argument("--name_b", help="The name of the second list.", default="disease B")
     
-    args =parser.parse_args()
+    args = parser.parse_args()
         
     main(**vars(args))

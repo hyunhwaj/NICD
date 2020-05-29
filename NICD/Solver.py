@@ -4,7 +4,7 @@ import logging
 import os
 
 class Solver:
-    data_path = os.path.join(os.path.dirname(__file__), "../data")
+    data_path = os.path.join(os.path.dirname(__file__), "data")
     df = pd.read_table(f"{data_path}/PCNet_v1.3.tsv", sep = "\t")
     
     G = nx.from_pandas_edgelist(df, 'from', 'to')
@@ -68,7 +68,7 @@ class Solver:
         gene_snps = df.groupby(['geneSymbol'])['snpId'].count().to_dict()
         gene_degs = dict(Solver.G.degree)
 
-        data_path = os.path.join(os.path.dirname(__file__), "../data")
+        data_path = os.path.join(os.path.dirname(__file__), "data")
         df = pd.read_table(f"{data_path}/all_gene_disease_associations.tsv.gz")
         df = df[(df.diseaseType == "disease") | (df.diseaseType == "phenotype")]
         gene_diss = df.groupby(['geneSymbol'])['diseaseId'].count().to_dict()
